@@ -2,3 +2,120 @@
 + words-to-numbers@1.5.1
 + @material-ui/core@4.11.3
 + @alan-ai/alan-sdk-web@1.8.18
+
+
+```````````````````````````
+ALAN AI SERVER SCRIPT
+```````````````````````````
+
+// Use this sample to create your own voice commands
+intent('hello world', p => {
+    p.play('(hello|hi there)');
+});
+intent('What does this app do',
+    reply('This is a news project.'));
+
+intent('what can I do here?',
+      reply('Hello, You will get Latest news here.'));
+
+
+const API_KEY = 'YOUR KEY HERE ';
+let savedArticles = [];
+
+// News by Source
+intent('Give me the news from $(source* (.*))', (p) => {
+    let NEWS_API_URL = `https://newsapi.org/v2/top-headlines?apiKey=${API_KEY}`;
+    
+    // Getting right formate of text 'BBc News' to 'bbc-news'
+    if(p.source.value) {
+        NEWS_API_URL = `${NEWS_API_URL}&sources=${p.source.value.toLowerCase().split(" ").join('-')}`
+    }
+    api.request(NEWS_API_URL, (error, response, body) => {
+        const { articles } = JSON.parse(body);
+        
+        if(!articles.length){
+            p.play('Sorry, please try searching from news from different source');
+            return;
+        }
+        savedArticles = articles;
+        
+        p.play({command: 'newHeadLines', articles });
+        p.play(`Here are the (latest|recent|current) ${p.source.value}.`);
+        
+        p.play('Would you like. Me to Read the Headlines?');
+        p.then(confirmation);
+
+    });
+})
+
+// News By Term
+intent('whats up with $(term* (.*))', (p) => {
+    let NEWS_API_URL = `https://newsapi.org/v2/everything?apiKey=${API_KEY}`;
+    
+    // Getting right formate of text 'BBc News' to 'bbc-news'
+    if(p.term.value) {
+        NEWS_API_URL = `${NEWS_API_URL}&q=${p.term.value}`
+    }
+    
+    api.request(NEWS_API_URL, (error, response, body) => {
+        const { articles } = JSON.parse(body);
+        
+        if(!articles.length) {
+            p.play('Sorry, please try searching from something else');
+            return;
+        }
+        savedArticles = articles;
+        
+        p.play({command: 'newHeadLines', articles });
+        p.play(`Here are the (latest|current) articles ${p.term.value}.`);
+        
+        p.play('Would you like. Me to Read the Headlines?');
+        p.then(confirmation);
+
+    });
+})
+// News By Top Headline
+const CATEGORIES = ['business', 'entertainment', 'general', 'health', 'science', 'sports', 'technology'];
+const CATEGORIES_INTENT = `${CATEGORIES.map((category) => `${category}~${category}`).join('|')}|`;
+
+intent(`(show|what is|tell me|what's|what are|what're|read) (the|) (recent|latest|) $(N news|headlines) (in|about|on|) $(C~ ${CATEGORIES_INTENT})`,
+  `(read|show|get|bring me|give me) (the|) (recent|latest) $(C~ ${CATEGORIES_INTENT}) $(N news|headlines)`, (p) => {
+    let NEWS_API_URL = `https://newsapi.org/v2/top-headlines?apiKey=${API_KEY}`;
+    
+    // Getting right formate of text 'BBc News' to 'bbc-news'
+    if(p.C.value) {
+        NEWS_API_URL = `${NEWS_API_URL}&category=${p.C.value}`
+    }
+    
+    api.request(NEWS_API_URL, (error, response, body) => {
+        const { articles } = JSON.parse(body);
+        
+        if(!articles.length) {
+            p.play('Sorry, please try searching from something else');
+            return;
+        }
+        savedArticles = articles;       
+        
+        p.play({command: 'newHeadLines', articles });
+        if(p.C.value) {
+            NEWS_API_URL = `${NEWS_API_URL}&category=${p.C.value}`
+        }else{
+            p.play(`Here are the (latest|current) articles ${p.C.value}.`);
+        }
+        
+        p.play('Would you like. Me to Read the Headlines?');
+        p.then(confirmation);
+
+    });
+});
+const confirmation = context(()=>{
+    intent('yes',async (p) =>{
+        for(let i=0; i< savedArticles.length; i++){
+            p.play({command: 'highlight', article: savedArticles[i]});
+            p.play(`$(savedArticles[i].title)`)
+        }
+    })
+    intent('no',(p)=>{
+        p.play('Sure, Sound good to me.')
+    })
+})
